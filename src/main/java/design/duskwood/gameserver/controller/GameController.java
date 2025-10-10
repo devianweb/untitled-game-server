@@ -20,14 +20,14 @@ public class GameController {
   private final GameServer gameServer;
 
   @RequestMapping(value = "/1/games", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
-  public ResponseEntity<GetGamesResponseViewModel> getGames() {
-    System.out.println("enter getGames()::");
+  public ResponseEntity<GetGamesResponseViewModel> getGameInstances() {
+    System.out.println("enter getGameInstances()::");
 
     var games = gameServer.getInstances();
     var viewModel = new GetGamesResponseViewModel(games);
     var response = ResponseEntity.ok().body(viewModel);
 
-    System.out.println("exit getGames():: response=" + response);
+    System.out.println("exit getGameInstances():: response=" + response);
     return response;
   }
 
