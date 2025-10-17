@@ -2,7 +2,6 @@ package design.duskwood.gameserver.controller;
 
 import design.duskwood.gameserver.controller.viewmodels.GetGamesResponseViewModel;
 import design.duskwood.gameserver.service.GameServer;
-import design.duskwood.gameserver.service.exceptions.NoAvailableThreadsException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -36,12 +35,9 @@ public class GameController {
     System.out.println("enter createGameInstance()::");
 
     ResponseEntity<String> response;
-    try {
-      var id = gameServer.startNewInstance();
-      response = ResponseEntity.ok().body(id);
-    } catch (NoAvailableThreadsException e) {
-      response = ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(null);
-    }
+
+    var id = gameServer.startNewInstance();
+    response = ResponseEntity.ok().body(id);
 
     System.out.println("exit createGameInstance():: response=" + response);
     return response;
