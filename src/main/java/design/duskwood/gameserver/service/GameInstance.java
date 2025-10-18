@@ -24,6 +24,9 @@ public class GameInstance implements Runnable {
   private final Map<WebSocketSession, SessionMessageQueue> sessions = new ConcurrentHashMap<>();
   private final Map<String, WebSocketSession> userSessions = new ConcurrentHashMap<>();
 
+  private final double maxV = 0.1d;
+  private final double acceleration = maxV * 0.1d;
+  private final double deceleration = maxV * 0.025d;
 
   public void handleNewWebsocketConnection(String userId, WebSocketSession session) {
     userSessions.put(userId, session);
@@ -124,38 +127,38 @@ public class GameInstance implements Runnable {
 
   private void updatePlayer(Player player) {
     //velocity
-    if (player.isUp() && player.getVy() < 0.1d) {
-      player.incrementVy(0.01d);
+    if (player.isUp() && player.getVy() < maxV) {
+      player.incrementVy(acceleration);
     }
-    if (player.isDown() && player.getVy() > -0.1d) {
-      player.decrementVy(0.01d);
+    if (player.isDown() && player.getVy() > -maxV) {
+      player.decrementVy(acceleration);
     }
-    if (player.isLeft() && player.getVx() > -0.1d) {
-      player.decrementVx(0.01d);
+    if (player.isLeft() && player.getVx() > -maxV) {
+      player.decrementVx(acceleration);
     }
-    if (player.isRight() && player.getVx() < 0.1d) {
-      player.incrementVx(0.01d);
+    if (player.isRight() && player.getVx() < maxV) {
+      player.incrementVx(acceleration);
     }
 
     //friction
     if (player.getVx() > 0) {
-        player.decrementVx(0.0025d);
+        player.decrementVx(deceleration);
         if (player.getVx() < 0.005d) {
           player.setVx(0);
         }
     } else if (player.getVx() < 0) {
-      player.incrementVx(0.0025d);
+      player.incrementVx(deceleration);
       if (player.getVx() > -0.005d) {
         player.setVx(0);
       }
     }
     if (player.getVy() > 0) {
-      player.decrementVy(0.0025d);
+      player.decrementVy(deceleration);
       if (player.getVy() < 0.005d) {
         player.setVy(0);
       }
     } else if (player.getVy() < 0) {
-      player.incrementVy(0.0025d);
+      player.incrementVy(deceleration);
       if (player.getVy() > -0.005d) {
         player.setVy(0);
       }
