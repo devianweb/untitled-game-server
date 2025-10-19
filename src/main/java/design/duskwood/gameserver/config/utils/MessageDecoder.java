@@ -22,6 +22,6 @@ public class MessageDecoder {
       case POSITION, AUTHORITATIVE -> throw new RuntimeException("should never happen");
     };
 
-    return new MessageWrapper(env.userId(), env.type(), payload);
+    return new MessageWrapper(env.userId(), env.type(), env.seqId(), payload);
   }
 }

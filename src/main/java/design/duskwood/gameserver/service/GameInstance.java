@@ -10,8 +10,10 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 @Data
 @RequiredArgsConstructor
@@ -23,6 +25,8 @@ public class GameInstance implements Runnable {
   @Getter
   private final Map<WebSocketSession, SessionMessageQueue> sessions = new ConcurrentHashMap<>();
   private final Map<String, WebSocketSession> userSessions = new ConcurrentHashMap<>();
+  private final Map<String, Integer> userSeqIds = new ConcurrentHashMap<>();
+  private final List<MessageWrapper> messages = new CopyOnWriteArrayList<>();
 
   private final double maxV = 0.1d;
   private final double acceleration = maxV * 0.1d;
@@ -31,6 +35,7 @@ public class GameInstance implements Runnable {
   public void handleNewWebsocketConnection(String userId, WebSocketSession session) {
     userSessions.put(userId, session);
     sessions.put(session, new SessionMessageQueue(session));
+    userSeqIds.put(userId, 0);
     gameState.addNewPlayer(userId);
   }
 
@@ -38,13 +43,12 @@ public class GameInstance implements Runnable {
     sessions.get(session).shutdownQueue();
     sessions.remove(session);
     userSessions.remove(userId);
+    userSeqIds.remove(userId);
     gameState.removePlayer(userId);
   }
 
   public void handleTextMessage(String userId, WebSocketSession session, MessageWrapper message) throws IOException {
-    if (message.type().equals(MessageType.INPUT) && message.payload() instanceof PlayerInput inputs) {
-      gameState.updatePlayerInputs(userId, inputs.up(), inputs.down(), inputs.left(), inputs.right());
-    }
+    messages.add(message);
   }
 
   private void broadcastToAll(MessageWrapper message) throws IOException {
@@ -87,6 +91,15 @@ public class GameInstance implements Runnable {
       var dt = now - lastUpdate;
 
       while (dt >= timeStep) {
+        messages.forEach(message -> {
+          if (message.type().equals(MessageType.INPUT) && message.payload() instanceof PlayerInput inputs) {
+            if (gameState.getPlayer(message.userId()) != null) {
+              gameState.updatePlayerInputs(message.userId(), inputs.up(), inputs.down(), inputs.left(), inputs.right());
+              userSeqIds.put(message.userId(), message.seqId());
+            }
+          }
+        });
+
         updateGame();
         ifMovingSendPositionUpdates();
         serverAuthoritativeTick(tick);
@@ -101,7 +114,7 @@ public class GameInstance implements Runnable {
   private void serverAuthoritativeTick(int tick) throws IOException {
       if (tick % 6 == 0) {
         for (String userId : gameState.getPlayers().keySet()) {
-          var message = new MessageWrapper(userId, MessageType.AUTHORITATIVE, gameState);
+          var message = new MessageWrapper(userId, MessageType.AUTHORITATIVE, userSeqIds.get(userId), gameState);
           broadcastToAll(message);
         }
       }
@@ -111,8 +124,9 @@ public class GameInstance implements Runnable {
     for (Map.Entry<String, Player> entry : gameState.getPlayers().entrySet()) {
       var userId = entry.getKey();
       var player = entry.getValue();
+      var seqId = userSeqIds.get(userId);
       if (player.isMoving()) {
-        var message = new MessageWrapper(userId, MessageType.POSITION, new PlayerPosition(player.getX(), player.getY(), player.getVx(), player.getVy()));
+        var message = new MessageWrapper(userId, MessageType.POSITION, seqId, new PlayerPosition(player.getX(), player.getY(), player.getVx(), player.getVy()));
         broadcastToAllExcept(entry.getKey(), message);
       }
     }
