@@ -23,6 +23,7 @@ public class GameInstance implements Runnable {
   @Getter
   private final Map<WebSocketSession, SessionMessageQueue> sessions = new ConcurrentHashMap<>();
   private final Map<String, WebSocketSession> userSessions = new ConcurrentHashMap<>();
+  private final Map<String, Integer> lastProcessedSeq = new ConcurrentHashMap<>();
 
 
   public void handleNewWebsocketConnection(String userId, WebSocketSession session) {
@@ -40,7 +41,12 @@ public class GameInstance implements Runnable {
 
   public void handleTextMessage(String userId, WebSocketSession session, MessageWrapper message) throws IOException {
     if (message.type().equals(MessageType.INPUT) && message.payload() instanceof PlayerInput inputs) {
-      gameState.updatePlayerInputs(userId, inputs.up(), inputs.down(), inputs.left(), inputs.right());
+      // Update the last processed sequence number for this player
+      int currentSeq = lastProcessedSeq.getOrDefault(userId, -1);
+      if (inputs.seq() > currentSeq) {
+        lastProcessedSeq.put(userId, inputs.seq());
+        gameState.updatePlayerInputs(userId, inputs.up(), inputs.down(), inputs.left(), inputs.right());
+      }
     }
   }
 
@@ -109,7 +115,8 @@ public class GameInstance implements Runnable {
       var userId = entry.getKey();
       var player = entry.getValue();
       if (player.isMoving()) {
-        var message = new MessageWrapper(userId, MessageType.POSITION, new PlayerPosition(player.getX(), player.getY(), player.getVx(), player.getVy()));
+        int lastSeq = lastProcessedSeq.getOrDefault(userId, 0);
+        var message = new MessageWrapper(userId, MessageType.POSITION, new PlayerPosition(player.getX(), player.getY(), player.getVx(), player.getVy(), lastSeq));
         broadcastToAllExcept(entry.getKey(), message);
       }
     }
