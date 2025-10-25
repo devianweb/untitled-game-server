@@ -15,11 +15,11 @@ public class GameState implements MessagePayload {
   }
 
   public void updatePlayerInputs(String userId, boolean up, boolean down, boolean left, boolean right) {
-    var player = players.get(userId);
-    player.setUp(up);
-    player.setDown(down);
-    player.setLeft(left);
-    player.setRight(right);
+    var player = players.get(userId).getInputs();
+    player.getKeyboardInputs().setUp(up);
+    player.getKeyboardInputs().setDown(down);
+    player.getKeyboardInputs().setLeft(left);
+    player.getKeyboardInputs().setRight(right);
   }
 
   public Player getPlayer(String userId) {

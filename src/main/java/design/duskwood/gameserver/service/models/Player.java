@@ -1,57 +1,73 @@
 package design.duskwood.gameserver.service.models;
 
 import lombok.Data;
+import lombok.SneakyThrows;
+import org.joml.Vector3d;
+import org.joml.Vector3f;
+
 
 @Data
 public class Player {
 
-  //inputs
-  private boolean up;
-  private boolean down;
-  private boolean left;
-  private boolean right;
+  private final double maxV = 0.1d;
+  private final double acceleration = maxV * 0.1d;
+  private final double deceleration = maxV * 0.025d;
 
-  //data
-  private double x;
-  private double y;
-  private double vx;
-  private double vy;
+  private Inputs inputs;
+  private Vector3d position;
+  private Vector3d velocity;
 
   public Player() {
-    this(0d, 0d, 0d, 0d);
+    this(new Vector3d(0d, 0d, 0d), new Vector3d(0d, 0d, 0d), new Inputs());
   }
 
-  public Player(double x, double y, double vx, double vy) {
-    this.x = x;
-    this.y = y;
-    this.vx = vx;
-    this.vy = vy;
-  }
-
-  public void incrementVx(double value) {
-    vx += value;
-  }
-
-  public void incrementVy(double value) {
-    vy += value;
-  }
-
-  public void decrementVx(double value) {
-    vx -= value;
-  }
-
-  public void decrementVy(double value) {
-    vy -= value;
-  }
-
-  public void applyVelocity() {
-    x += vx;
-    y += vy;
+  public Player(Vector3d position, Vector3d velocity, Inputs inputs) {
+    this.position = position;
+    this.velocity = velocity;
+    this.inputs = inputs;
   }
 
   public boolean isMoving() {
-    return this.vx != 0 || this.vy != 0;
+    return velocity.lengthSquared() > 0;
   }
 
+  @SneakyThrows
+  public void updatePlayerPositionAndVelocity() {
+
+    var tempVelocity = new Vector3d(velocity);
+
+    //inputs
+    var direction = new Vector3d(
+      (inputs.getKeyboardInputs().isRight() ? 1 : 0) - (inputs.getKeyboardInputs().isLeft() ? 1 : 0),
+      (inputs.getKeyboardInputs().isUp() ? 1 : 0) - (inputs.getKeyboardInputs().isDown() ? 1 : 0),
+      0
+      );
+
+    //acceleration, but normalised!
+    if (direction.lengthSquared() > 0) {
+      direction.normalize().mul(this.acceleration);
+      tempVelocity.add(direction);
+    }
+
+    //friction 'n dead zone 'tings
+    if (direction.lengthSquared() == 0 && tempVelocity.lengthSquared() > 0) {
+      var speed = tempVelocity.length();
+      var newSpeed = speed - this.deceleration;
+
+      if (newSpeed <= 0.005) {
+        tempVelocity.set(0, 0, 0);
+      } else {
+        tempVelocity.mul(newSpeed / speed);
+      }
+    }
+
+    //clampy mc clampface
+    if (tempVelocity.length() > this.maxV) {
+      tempVelocity.mul(this.maxV / tempVelocity.length());
+    }
+
+    position.add(tempVelocity);
+    velocity.set(tempVelocity);
+  }
 
 }

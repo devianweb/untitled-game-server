@@ -16,6 +16,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-websocket'
 
+    implementation 'org.joml:joml:1.10.5'
+
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }
 
