@@ -14,7 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.locks.LockSupport;
 
 @Data
 @RequiredArgsConstructor
@@ -28,10 +27,6 @@ public class GameInstance implements Runnable {
   private final Map<String, WebSocketSession> userSessions = new ConcurrentHashMap<>();
   private final Map<String, Integer> userSeqIds = new ConcurrentHashMap<>();
   private final List<MessageWrapper> messages = new CopyOnWriteArrayList<>();
-
-  private final double maxV = 0.1d;
-  private final double acceleration = maxV * 0.1d;
-  private final double deceleration = maxV * 0.025d;
 
   public void handleNewWebsocketConnection(String userId, WebSocketSession session) {
     userSessions.put(userId, session);
@@ -117,12 +112,12 @@ public class GameInstance implements Runnable {
   }
 
   private void serverAuthoritativeTick(int tick) throws IOException {
-      if (tick % 6 == 0) {
-        for (String userId : gameState.getPlayers().keySet()) {
-          var message = new MessageWrapper(userId, MessageType.AUTHORITATIVE, userSeqIds.get(userId), gameState);
-          broadcastToAll(message);
-        }
+    if (tick % 6 == 0) {
+      for (String userId : gameState.getPlayers().keySet()) {
+        var message = new MessageWrapper(userId, MessageType.AUTHORITATIVE, userSeqIds.get(userId), gameState);
+        broadcastToAll(message);
       }
+    }
   }
 
   private void ifMovingSendPositionUpdates() throws IOException {
@@ -131,7 +126,7 @@ public class GameInstance implements Runnable {
       var player = entry.getValue();
       var seqId = userSeqIds.get(userId);
       if (player.isMoving()) {
-        var message = new MessageWrapper(userId, MessageType.POSITION, seqId, new PlayerPosition(player.getX(), player.getY(), player.getVx(), player.getVy()));
+        var message = new MessageWrapper(userId, MessageType.POSITION, seqId, new PlayerPosition(player.getPosition(), player.getVelocity()));
         broadcastToAllExcept(entry.getKey(), message);
       }
     }
@@ -140,50 +135,8 @@ public class GameInstance implements Runnable {
   private void updateGame() {
     var players = gameState.getPlayers().values();
     for (Player player : players) {
-      updatePlayer(player);
+      player.updatePlayerPositionAndVelocity();
     }
-  }
-
-  private void updatePlayer(Player player) {
-    //velocity
-    if (player.isUp() && player.getVy() < maxV) {
-      player.incrementVy(acceleration);
-    }
-    if (player.isDown() && player.getVy() > -maxV) {
-      player.decrementVy(acceleration);
-    }
-    if (player.isLeft() && player.getVx() > -maxV) {
-      player.decrementVx(acceleration);
-    }
-    if (player.isRight() && player.getVx() < maxV) {
-      player.incrementVx(acceleration);
-    }
-
-    //friction
-    if (player.getVx() > 0) {
-        player.decrementVx(deceleration);
-        if (player.getVx() < 0.005d) {
-          player.setVx(0);
-        }
-    } else if (player.getVx() < 0) {
-      player.incrementVx(deceleration);
-      if (player.getVx() > -0.005d) {
-        player.setVx(0);
-      }
-    }
-    if (player.getVy() > 0) {
-      player.decrementVy(deceleration);
-      if (player.getVy() < 0.005d) {
-        player.setVy(0);
-      }
-    } else if (player.getVy() < 0) {
-      player.incrementVy(deceleration);
-      if (player.getVy() > -0.005d) {
-        player.setVy(0);
-      }
-    }
-
-    player.applyVelocity();
   }
 
   private void gameStateLogging(int tick) {
