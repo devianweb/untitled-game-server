@@ -18,6 +18,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @Data
 @RequiredArgsConstructor
 public class GameInstance implements Runnable {
+  private final String ownerUserId;
+  private final String name;
   private final String id;
   private volatile boolean running = true;
   private ObjectMapper objectMapper = new ObjectMapper();
@@ -27,6 +29,43 @@ public class GameInstance implements Runnable {
   private final Map<String, WebSocketSession> userSessions = new ConcurrentHashMap<>();
   private final Map<String, Integer> userSeqIds = new ConcurrentHashMap<>();
   private final List<MessageWrapper> messages = new CopyOnWriteArrayList<>();
+
+  @SneakyThrows
+  @Override
+  public void run() {
+    var lastUpdate = System.nanoTime();
+    var timeStep = 1000000000 / 60;
+    var tick = 0;
+
+
+    while (running) {
+      var now = System.nanoTime();
+      var dt = now - lastUpdate;
+
+      while (dt >= timeStep) {
+        messages.forEach(message -> {
+          if (message.type().equals(MessageType.INPUT) && message.payload() instanceof PlayerInput inputs) {
+            if (gameState.getPlayer(message.userId()) != null) {
+              gameState.updatePlayerInputs(message.userId(), inputs.up(), inputs.down(), inputs.left(), inputs.right());
+              userSeqIds.put(message.userId(), message.seqId());
+            }
+          }
+        });
+
+        if (!messages.isEmpty()) {
+          messages.clear();
+        }
+
+        updateGame();
+        ifMovingSendPositionUpdates();
+        serverAuthoritativeTick(tick);
+        gameStateLogging(tick);
+        dt -= timeStep;
+        lastUpdate += timeStep;
+        tick++;
+      }
+    }
+  }
 
   public void handleNewWebsocketConnection(String userId, WebSocketSession session) {
     userSessions.put(userId, session);
@@ -70,43 +109,6 @@ public class GameInstance implements Runnable {
       var sesh = entry.getKey();
       if (sesh != excluded && sesh.isOpen()) {
         entry.getValue().enqueue(text);
-      }
-    }
-  }
-
-  @SneakyThrows
-  @Override
-  public void run() {
-    var lastUpdate = System.nanoTime();
-    var timeStep = 1000000000 / 60;
-    var tick = 0;
-
-
-    while (running) {
-      var now = System.nanoTime();
-      var dt = now - lastUpdate;
-
-      while (dt >= timeStep) {
-        messages.forEach(message -> {
-          if (message.type().equals(MessageType.INPUT) && message.payload() instanceof PlayerInput inputs) {
-            if (gameState.getPlayer(message.userId()) != null) {
-              gameState.updatePlayerInputs(message.userId(), inputs.up(), inputs.down(), inputs.left(), inputs.right());
-              userSeqIds.put(message.userId(), message.seqId());
-            }
-          }
-        });
-
-        if (!messages.isEmpty()) {
-          messages.clear();
-        }
-
-        updateGame();
-        ifMovingSendPositionUpdates();
-        serverAuthoritativeTick(tick);
-        gameStateLogging(tick);
-        dt -= timeStep;
-        lastUpdate += timeStep;
-        tick++;
       }
     }
   }

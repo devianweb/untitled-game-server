@@ -1,18 +1,19 @@
 package design.duskwood.gameserver.controller;
 
+import design.duskwood.gameserver.controller.viewmodels.CreateGameInstanceRequestModel;
+import design.duskwood.gameserver.controller.viewmodels.CreateGameInstanceViewModel;
+import design.duskwood.gameserver.controller.viewmodels.GameInstanceViewModel;
 import design.duskwood.gameserver.controller.viewmodels.GetGamesResponseViewModel;
 import design.duskwood.gameserver.service.GameServer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api")
+@CrossOrigin(origins = {"http://localhost:5173", "https://devianweb.github.io"})
 @RequiredArgsConstructor
 public class GameController {
 
@@ -23,7 +24,10 @@ public class GameController {
     System.out.println("enter getGameInstances()::");
 
     var games = gameServer.getInstances();
-    var viewModel = new GetGamesResponseViewModel(games);
+    var gameInstanceViewModels = games.stream()
+      .map(game -> new GameInstanceViewModel(game.getName(), game.getId(), game.getUserSessions().size()))
+      .toList();
+    var viewModel = new GetGamesResponseViewModel(gameInstanceViewModels);
     var response = ResponseEntity.ok().body(viewModel);
 
     System.out.println("exit getGameInstances():: response=" + response);
@@ -31,13 +35,12 @@ public class GameController {
   }
 
   @RequestMapping(value = "/1/games/create", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
-  public ResponseEntity<String> createGameInstance() {
+  public ResponseEntity<CreateGameInstanceViewModel> createGameInstance(@RequestBody CreateGameInstanceRequestModel req) {
     System.out.println("enter createGameInstance()::");
 
-    ResponseEntity<String> response;
-
-    var id = gameServer.startNewInstance();
-    response = ResponseEntity.ok().body(id);
+    var id = gameServer.startNewInstance(req.userId(), req.name());
+    var viewModel = new CreateGameInstanceViewModel(id);
+    var response = ResponseEntity.ok().body(viewModel);
 
     System.out.println("exit createGameInstance():: response=" + response);
     return response;

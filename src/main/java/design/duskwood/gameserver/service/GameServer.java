@@ -1,6 +1,8 @@
 package design.duskwood.gameserver.service;
 
 import design.duskwood.gameserver.service.models.MessageWrapper;
+import design.duskwood.gameserver.service.models.exceptions.TooManyInstancesException;
+import design.duskwood.gameserver.service.models.exceptions.UserAlreadyHasInstanceException;
 import org.springframework.stereotype.Service;
 import org.springframework.web.socket.WebSocketSession;
 
@@ -30,24 +32,32 @@ public class GameServer {
     instance.handleTextMessage(userId, session, message);
   }
 
-  public String startNewInstance() {
+  public String startNewInstance(String userId, String serverName) {
     var id = UUID.randomUUID().toString();
-    return startNewInstance(id);
+    return startNewInstance(userId, serverName, id);
   }
 
-  public String startNewInstance(String id) {
-    GameInstance instance = new GameInstance(id);
-    instances.put(id, instance);
+  public String startNewInstance(String userId, String serverName, String gameId) {
+    if (instances.size() >= 4) {
+      throw new TooManyInstancesException("too many instances running already");
+    }
+
+    if (instances.values().stream().anyMatch(instance -> instance.getOwnerUserId().equals(userId))) {
+      throw new UserAlreadyHasInstanceException("user already has running server");
+    }
+
+    GameInstance instance = new GameInstance(userId, serverName, gameId);
+    instances.put(gameId, instance);
     var thread = new Thread(instance);
     thread.start();
-    threads.put(id, thread);
-    return id;
+    threads.put(gameId, thread);
+    return gameId;
   }
 
   public GameInstance getInstance(String id) {
     var instance = instances.get(id);
     if (instance == null) {
-      startNewInstance(id);
+      throw new RuntimeException("game instance does not exist");
     }
     return instances.get(id);
   }
